@@ -1,9 +1,18 @@
-FROM eclipse-temurin:17-jdk-alpine
-
+# ---------- Etapa 1: build ----------
+FROM maven:3.9-eclipse-temurin-21 AS builder
 WORKDIR /app
 
-COPY target/*.jar app.jar
+COPY pom.xml .
+RUN mvn dependency:go-offline
 
-EXPOSE ${SPRING_APP_PORT}
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-ENTRYPOINT ["java","-jar","/app/app.jar"]
+# ---------- Etapa 2: runtime ----------
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+COPY --from=builder /app/target/*.jar app.jar
+
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","app.jar"]
