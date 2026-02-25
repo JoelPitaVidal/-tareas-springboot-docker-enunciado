@@ -1,28 +1,50 @@
 services:
+  # Servizo de base de datos PostgreSQL
   postgres:
-    image: postgres:15
+    image: postgres:16-alpine
+    container_name: tareas-postgres
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-tareasdb}
     ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tareas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tareasdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # Servizo da aplicación Spring Boot
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tareas-app
     environment:
-      - SPRING_APP_PORT=${SPRING_APP_PORT}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_HOST=postgres
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-tareasdb}
+      SPRING_APP_PORT: ${SPRING_APP_PORT:-9020}
     ports:
-      - "${SPRING_APP_PORT}:${SPRING_APP_PORT}"
+      - "${SPRING_APP_PORT:-9020}:${SPRING_APP_PORT:-9020}"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    networks:
+      - tareas-network
+    restart: unless-stopped
 
 volumes:
-  pgdata:
+  postgres_data:
+    driver: local
+
+networks:
+  tareas-network:
+    driver: bridge
